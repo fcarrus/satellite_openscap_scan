@@ -1,7 +1,7 @@
 satellite_openscap_scan
 =========
 
-This roles allows Satellite Clients to execute OpenSCAP scannings and report their results to Satellite without installing/configuring Puppet or Ruby.
+This role allows Satellite Clients to execute OpenSCAP scannings and report their results to Satellite without installing/configuring Puppet or Ruby.
 
 Requirements
 ------------
