@@ -1,0 +1,46 @@
+#- name: Run OpenSCAP scan
+#  hosts: all
+#  become: true
+#  gather_facts: false
+#  tasks:
+  
+  - name: Get policy details for host
+    uri: 
+      url: "https://{{ satellite_host }}/api/hosts/{{ inventory_hostname }}/enc"
+      force_basic_auth: true
+      url_username: "{{ satellite_username }}"
+      url_password: "{{ satellite_password }}"
+      method: GET
+      return_content: true
+      body_format: json
+    register: host_enc
+
+  - name: Check for HostGroup
+    fail:
+      msg: "Host does not belong to any HostGroup."
+    when:
+    - not host_enc.json.data.parameters.hostgroup is defined
+
+  - name: Check for Policy assignment to HostGroup
+    fail:
+      msg: "Host does not belong to a HostGroup for which a SCAP Policy has been defined."
+    when:
+    - not host_enc.json.data.classes.foreman_scap_client is defined
+
+  - name: Ensure dependencies are installed
+    yum:
+      name: 
+      - openscap-scanner
+      - bzip2
+      state: installed
+
+  - name: Get OpenSCAP capsule info
+    set_fact:
+      scap_server: "{{ host_enc.json.data.classes.foreman_scap_client.server }}:{{ host_enc.json.data.classes.foreman_scap_client.port }}"
+
+  - name: Scan and upload results for each policy
+    include_tasks: scan.yml
+    loop: "{{ host_enc.json.data.classes.foreman_scap_client.policies }}"
+    loop_control:
+      loop_var: policy
+    

@@ -1,0 +1,57 @@
+
+  - name: Get OpenSCAP profile info
+    set_fact:
+      scap_policy_id: "{{ policy.id }}"
+      scap_profile_id: "{{ policy.profile_id }}"
+      scap_download_path: "{{ policy.content_path }}"
+      scap_content_path: "{{ policy.content_path }}"
+      scap_tailoring_download_path: "{{ policy.tailoring_download_path }}"
+      scap_tailoring_content_path: "{{ policy.tailoring_path }}"
+
+  - name: Download SCAP content to local path
+    get_url:
+      client_cert: "{{ client_cert_file }}"
+      client_key: "{{ client_key_file }}"
+      url: "https://{{ scap_server }}{{ scap_download_path }}"
+      dest: "{{ scap_content_path }}"
+
+  - name: Download SCAP tailoring content to local path, if enabled
+    get_url:
+      client_cert: "{{ client_cert_file }}"
+      client_key: "{{ client_key_file }}"
+      url: "https://{{ scap_server }}{{ scap_tailoring_download_path }}"
+      dest: "{{ scap_tailoring_content_path }}"
+    when: scap_tailoring_download_path | length > 0  
+
+  - name: Define tailoring flags for oscap command line
+    set_fact:
+      tailoring_subcommand: "--tailoring-file {{ scap_tailoring_content_path }}"
+    when: scap_tailoring_download_path | length > 0  
+
+  - name: Make a temp dir for results
+    tempfile:
+      state: directory
+      suffix: oscap
+    register: resultsdir
+
+  - name: Execute OpenSCAP scan
+    command: "oscap xccdf eval {{ '--fetch-remote-resources' if fetch_remote_resources else '' }} --profile {{ scap_profile_id }} {{ tailoring_subcommand }} --results-arf {{ resultsdir.path }}/results.xml {{ scap_content_path }}"
+    register: oscap
+    failed_when: oscap.rc != 2 and oscap.rc != 0
+
+  - name: Send results to Satellite
+    uri:
+      url: "https://{{ scap_server }}/compliance/arf/{{ scap_policy_id }}"
+      client_cert: "/etc/pki/consumer/cert.pem"
+      client_key: "/etc/pki/consumer/key.pem"
+      method: POST
+      headers:
+        Content-Type: "text/xml"
+      src: "{{ resultsdir.path }}/results.xml"
+      remote_src: "True"
+      timeout: 60
+
+  - name: Remove temp dir
+    file:
+      path: "{{ resultsdir.path }}"
+      state: absent

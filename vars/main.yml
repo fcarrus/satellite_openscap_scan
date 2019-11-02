@@ -1,0 +1,7 @@
+---
+# vars file for satellite_openscap_scan
+fetch_remote_resources: false
+tailoring_subcommand: ''
+client_cert_file: "/etc/pki/consumer/cert.pem"
+client_key_file: "/etc/pki/consumer/key.pem"
+
